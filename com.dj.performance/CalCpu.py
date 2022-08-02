@@ -1,3 +1,4 @@
+import threading
 import time
 import subprocess
 import re
@@ -118,88 +119,93 @@ pid_cpu_list = []
 total_jiffies = []
 pid_jiffies = []
 pid_cpu_use = {}
-cpu_count = 6
+cpu_count = 2
 
 
 def RealGetCpuInfo(pid: str):
-    pid_order = 'adb shell cat proc/%s/stat' % pid  # 获取连接设备
-    order = 'adb shell cat proc/stat'  # 获取连接设备
-    pid_cpu = str(subprocess.Popen(pid_order, shell=True, stdout=subprocess.PIPE).stdout.read())[2:].split(" ")
-    total_cpu = str(subprocess.Popen(order, shell=True, stdout=subprocess.PIPE).stdout.read())[2:].split("\\n")[0]
-    total_cpu = re.split(' +', total_cpu)
-    total_cpu_map = {}
-    for item in total_cpu_list_name:
-        total_cpu_map[item] = total_cpu[total_cpu_list_name.index(item)]
-    total_cpu_list.append(total_cpu_map)
+  pid_order = 'adb shell cat proc/%s/stat' % pid  # 获取连接设备
+  order = 'adb shell cat proc/stat'  # 获取连接设备
+  pid_cpu = str(subprocess.Popen(pid_order, shell=True, stdout=subprocess.PIPE).stdout.read())[2:].split(" ")
+  total_cpu = str(subprocess.Popen(order, shell=True, stdout=subprocess.PIPE).stdout.read())[2:].split("\\n")[0]
+  total_cpu = re.split(' +', total_cpu)
+  total_cpu_map = {}
+  for item in total_cpu_list_name:
+    total_cpu_map[item] = total_cpu[total_cpu_list_name.index(item)]
+  total_cpu_list.append(total_cpu_map)
 
-    pid_cpu_map = {}
-    for item in pid_cpu_list_name:
-        pid_cpu_map[item] = pid_cpu[pid_cpu_list_name.index(item)]
-    pid_cpu_list.append(pid_cpu_map)
+  pid_cpu_map = {}
+  for item in pid_cpu_list_name:
+    pid_cpu_map[item] = pid_cpu[pid_cpu_list_name.index(item)]
+  pid_cpu_list.append(pid_cpu_map)
 
-    print(pid_cpu)
-    print(total_cpu)
+  # print(pid_cpu)
+  # print(total_cpu)
 
-    # fo = open("stat%s.txt" % num, "w")
-    # for astring in pi:
-    #     fo.write(astring)
-    #     fo.write("\n")
-    # fo.close()
-
-
-def calCpu():
-    process_name = "com.dj.songs"
-    pip = getPid(process_name)
-    GetCpu(pip)
-    print("next line")
-    calCpuJiffies()
-    calPidCpuUse()
-    print(pid_cpu_use)
+  # fo = open("stat%s.txt" % num, "w")
+  # for astring in pi:
+  #     fo.write(astring)
+  #     fo.write("\n")
+  # fo.close()
 
 
-def calPidCpuUse():
-    for item in range(0, cpu_count - 1):
-        pid_cpu_use["第 %s 个时间间隔" % item] = (pid_jiffies[item + 1] - pid_jiffies[item]) / float(
-            total_jiffies[item + 1] - total_jiffies[item]) * 100
+def clear():
+  total_cpu_list.clear()
+  pid_cpu_list.clear()
+  total_jiffies.clear()
+  pid_jiffies.clear()
+  pid_cpu_use.clear()
 
 
-def calCpuJiffies():
-    for item in total_cpu_list:
-        total_jiffies.append(addTotalCpuJiffies(item))
-    print(total_jiffies)
+def calCpu(num):
+  print(threading.currentThread().getName())
+  process_name = "com.dj.songs"
+  pid = getPid(process_name)
+  RealGetCpuInfo(pid)
+  calCpuJiffies(num)
+  # print("next line")
+  calPidCpuUse(num)
+  # print(pid_cpu_use[num])
+  return pid_cpu_use[num]
 
-    for item in pid_cpu_list:
-        pid_jiffies.append(calPidCpuJiffies(item))
-    print(pid_jiffies)
+
+def calPidCpuUse(num):
+  if num > 0:
+    pid_cpu_use[num] = (pid_jiffies[num] - pid_jiffies[num - 1]) / float(
+      total_jiffies[num] - total_jiffies[num - 1]) * 100
+  else: pid_cpu_use[num] = 0
+
+
+def calCpuJiffies(num):
+  item = total_cpu_list[num]
+  total_jiffies.append(addTotalCpuJiffies(item))
+  # print(total_jiffies)
+
+  item = pid_cpu_list[num]
+  pid_jiffies.append(calPidCpuJiffies(item))
+  # print(pid_jiffies)
 
 
 def calPidCpuJiffies(cur: {}):
-    pid_jiffie = 0
-    for item in pid_cpu_list_name[13:17]:
-        pid_jiffie = pid_jiffie + int(cur[item])
-    return pid_jiffie
+  pid_jiffie = 0
+  for item in pid_cpu_list_name[13:17]:
+    pid_jiffie = pid_jiffie + int(cur[item])
+  return pid_jiffie
 
 
 def addTotalCpuJiffies(cur: {}):
-    total_jiffie = 0
-    for item in total_cpu_list_name[1:8]:
-        total_jiffie = total_jiffie + int(cur[item])
-    return total_jiffie
-
-
-def GetCpu(pid: str):
-    for num in range(0, cpu_count):
-        RealGetCpuInfo(pid)
-        time.sleep(1)
+  total_jiffie = 0
+  for item in total_cpu_list_name[1:8]:
+    total_jiffie = total_jiffie + int(cur[item])
+  return total_jiffie
 
 
 def getPid(process_name: str):
-    order = 'adb shell ps |grep %s' % process_name  # 获取连接设备
-    pi = str(subprocess.Popen(order, shell=True, stdout=subprocess.PIPE).stdout.read())
-    pid = re.split(' +', pi)[1]
-    print(pid)
-    return pid
+  order = 'adb shell ps |grep %s' % process_name  # 获取连接设备
+  pi = str(subprocess.Popen(order, shell=True, stdout=subprocess.PIPE).stdout.read())
+  pid = re.split(' +', pi)[1]
+  # print(pid)
+  return pid
 
 
 if __name__ == '__main__':
-    calCpu()
+  calCpu()
